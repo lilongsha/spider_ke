@@ -2,6 +2,8 @@
 
 # Press ⌃R to execute it or replace it with your code.
 # Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
+import time
+from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED
 from urllib import request
 from bs4 import BeautifulSoup
 import re
@@ -11,15 +13,16 @@ import os
 # url 图片连接
 # path 图片存储目录
 def save_img(img_url, img_path):
-    print(img_url, img_path)
+    # print(img_url, img_path)
     img_url = str(img_url)
     img_name = img_url[img_url.rfind('/'):]
     filepath = img_path + img_name
-    print(filepath)
+    # print(filepath)
     request.urlretrieve(url=img_url, filename=filepath)
+    return filepath
 
 
-def process_html(html_context, project_name):
+def process_html(html_context, project_name, all_task):
     soup = BeautifulSoup(html_context)
     # 通过标签获取图片分类对应id
     li_tags = soup.select('.photo-type > li')
@@ -53,21 +56,37 @@ def process_html(html_context, project_name):
             for v in key[k][t]:
                 # print(v)
                 # print(t)
-                save_img(img_url=v, img_path=path)
+                all_task.append(pool.submit(save_img, img_url=v, img_path=path))
+                # print(task.result())
+                # save_img(img_url=v, img_path=path)
 
 
 if __name__ == '__main__':
+    start = time.time()
+    pool = ThreadPoolExecutor(max_workers=50)
+    all_task = []
     headers = {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) '
                       'Chrome/97.0.4692.99 Safari/537.36',
     }
-    # 楼盘名称，用于创建目录
-    name = '正基九宸'
-    # 楼盘图片页面url
-    url = 'https://sjz.fang.ke.com/loupan/p_zjjcbklai/xiangce/5576186.html'
-    req = request.Request(url=url, headers=headers)
-    response = request.urlopen(req)
-    html = response.read()
-    if not os.path.exists(name):
-        os.mkdir(name)
-    process_html(html_context=html, project_name=name)
+    # 楼盘名称 楼盘链接
+    projects = [['', '']]
+    for project in projects:
+        # 楼盘名称，用于创建目录
+        name = project[0]
+        # 楼盘图片页面url
+        url = project[1]
+        req = request.Request(url=url, headers=headers)
+        response = request.urlopen(req)
+        html = response.read()
+        if not os.path.exists(name):
+            os.mkdir(name)
+        # thread = pool.submit(process_html, html_context=html, project_name=name, all_task=all_task)
+        # all_task.append(pool.submit(process_html, html_context=html, project_name=name, all_task=all_task))
+        process_html(html_context=html, project_name=name, all_task=all_task)
+
+    print(len(all_task))
+    wait(all_task)
+    pool.shutdown()
+    end = time.time()
+    print('共耗时：', end - start)

@@ -1,9 +1,10 @@
 import chardet as chardet
 from bs4 import BeautifulSoup
 from urllib import request
+import re
 
 
-def process_tuiguang(url, project_name, file):
+def process_tuiguang(url, search_key, file, file1):
     headers = {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) '
                       'Chrome/97.0.4692.99 Safari/537.36',
@@ -30,7 +31,7 @@ def process_tuiguang(url, project_name, file):
     # print(charset)
     # 解码：获得易于阅读的网页源码
     # html = html.decode(charset['encoding']).encode('utf-8')
-    get_tuiguang(html=html, project_name=project_name, file=file)
+    get_tuiguang1(html=html, search_key=search_key, file=file, file1=file1)
 
 
 def get_tuiguang(html, project_name, file):
@@ -43,3 +44,60 @@ def get_tuiguang(html, project_name, file):
     text = project_name + '\t' + str(flag) + '\n'
     file.writelines(text)
     file.flush()
+
+
+def process_a(s1, search_key, file):
+    s1 = str(s1)
+    s1 = re.sub('<a(\\ [a-z|A-Z|-]*\\=[a-z|A-Z|0-9|:|\.|/|_|\\?|\\|\\-|\\=|\\&|\\;|\\"|\\%|\\#]*)*>', '', s1)
+    s1 = re.sub('</a>', '', s1)
+    list = re.findall('<font color=\\"#CC0000\\">(\S*)</font>', s1)
+    red_key = []
+    for li in list:
+        red_key.append(li)
+    s1 = re.sub('<font color=\\"#CC0000\\">', '', s1)
+    s1 = re.sub('</font>', '', s1)
+    is_include_key = "不包含"
+    is_include_key_flag = 0
+    is_include_key1 = "不包含"
+    is_include_key_flag1 = 0
+    if s1.find(search_key) > 0:
+        is_include_key = "包含"
+        is_include_key_flag = 1
+    search_key1 = re.sub("投稿", "", search_key);
+    if s1.find(search_key1) > 0:
+        is_include_key1 = "包含"
+        is_include_key_flag1 = 1
+
+    text = search_key + '\t' + str(red_key) + '\t' + is_include_key + '\t' + is_include_key1 + '\t' + s1 + '\n'
+    file.writelines(text)
+
+    return is_include_key_flag, is_include_key_flag1
+
+
+def get_tuiguang1(html, search_key, file, file1):
+    soup = BeautifulSoup(html)
+    soup.prettify()
+    # 根列表
+    root_div = soup.select("div #content_left")
+    # print(root_div)
+    # 获取根div下的每一个广告div
+    ad_divs = root_div[0].find_all("div", attrs={"class": "_2z1q32z"})
+    is_include_search_key = 0
+    is_include_search_key1 = 0
+    for ad in ad_divs:
+        containers = ad.find_all("div", attrs={"class": "wbrjf67"})
+        for container in containers:
+            if len(container["class"]) < 2:
+                # print(container["class"])
+                a_list = container.select('a')
+                # print(a_list)
+                for a in a_list:
+                    i, j = process_a(a, search_key=search_key, file=file)
+                    is_include_search_key = is_include_search_key + i
+                    is_include_search_key1 = is_include_search_key1 + j
+    text = str(search_key) + '\t' + str(is_include_search_key) + '\t' + str(is_include_search_key1) + '\n'
+    file1.writelines(text)
+    file1.flush()
+    file.writelines(text)
+    file.flush()
+
